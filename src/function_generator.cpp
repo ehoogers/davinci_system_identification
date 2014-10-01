@@ -1,10 +1,10 @@
 
 #include "ros/ros.h"
 #include "std_msgs/Float64MultiArray.h"
+#include "sensor_msgs/JointState.h"
 #include "string"
 #include "math.h"
 #include <time.h>
-
 
 // Namespaces
 using namespace std;
@@ -46,19 +46,18 @@ public:
 	string signal;
 	double ampl;
 	double freq;
+
 	double output(double t);
 
 private:
 
 };
-
 SignalGenerator::SignalGenerator(string type,double amplitude,double frequency)
 {
 	ampl = amplitude;
 	freq = frequency;
 	signal = type;
 }
-
 double SignalGenerator::output(double t)
 {
 	double value;
@@ -93,8 +92,10 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "function_generator");
     ros::NodeHandle n;
     ros::Publisher signal_pub = n.advertise<std_msgs::Float64MultiArray>("davinci_si/input",1);
+    ros::Publisher setpoint_pub = n.advertise<sensor_msgs::JointState>("davinci_joystick/joint_states",1);
     ros::Rate rate(FREQ);
 
+    sensor_msgs::JointState setpoint;
     std_msgs::Float64MultiArray msg;
     msg.data.resize(2);
 
@@ -102,26 +103,42 @@ int main(int argc, char **argv)
 
     char str[10];
     double f,a;
-
     printf("Enter signal: ");
     scanf("%s",str);
     printf("Frequency: ");
     scanf("%lf",&f);
-    printf("Amplitude :");
+    printf("Amplitude: ");
     scanf("%lf",&a);
 
     SignalGenerator input_signal(str,a,f);
-    double value;
+
+    double signal;
     double t;
 
     while (ros::ok()) // Keep spinning loop until user presses Ctrl+C
     {
     	t = stopwatch.elapsed_time();
-    	value = input_signal.output(stopwatch.elapsed_time());
+    	signal = input_signal.output(t);
 
     	msg.data[0] = t;
-    	msg.data[1] = value;
+    	msg.data[1] = signal;
     	signal_pub.publish(msg);
+
+    	setpoint.header.stamp = ros::Time::now();
+    	setpoint.name.resize(4);
+    	setpoint.position.resize(4);
+    	setpoint.name[0] ="pitch";
+    	setpoint.position[0] = signal;
+    	setpoint.name[1] ="yaw";
+    	setpoint.position[1] = signal;
+    	setpoint.name[2] ="roll";
+    	setpoint.position[2] = signal;
+    	setpoint.name[3]="pinch";
+    	setpoint.position[3]=signal;
+        //send the joint state
+    	setpoint_pub.publish(setpoint);
+
+
 
         rate.sleep(); // Sleep for the rest of the cycle, to enforce the loop rate
     }
