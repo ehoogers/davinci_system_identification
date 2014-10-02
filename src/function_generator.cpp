@@ -86,13 +86,32 @@ double SignalGenerator::output(double t)
 }
 
 
+class Output
+{
+
+public:
+	sensor_msgs::JointState joint_state;
+	void OutputCallback(sensor_msgs::JointState Output);
+};
+
+void Output::OutputCallback(sensor_msgs::JointState Output)
+{
+	joint_state = Output;
+}
+
+
+
 int main(int argc, char **argv)
 {
 	// ROS initialization
+
+	Output output;
+
     ros::init(argc, argv, "function_generator");
     ros::NodeHandle n;
     ros::Publisher signal_pub = n.advertise<std_msgs::Float64MultiArray>("davinci_si/input",1);
     ros::Publisher setpoint_pub = n.advertise<sensor_msgs::JointState>("davinci_joystick/joint_states",1);
+    ros::Subscriber postion_sub = n.subscribe("davinci_joystick/joint_states", 1, &Output::OutputCallback, &output);
     ros::Rate rate(FREQ);
 
     sensor_msgs::JointState setpoint;
@@ -139,7 +158,7 @@ int main(int argc, char **argv)
     	setpoint_pub.publish(setpoint);
 
 
-
+    	ros::spinOnce();
         rate.sleep(); // Sleep for the rest of the cycle, to enforce the loop rate
     }
 
