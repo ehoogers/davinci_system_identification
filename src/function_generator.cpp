@@ -98,10 +98,10 @@ public:
 
 Output::Output()
 {
-	joint_state.name.resize(4);
-	joint_state.position.resize(4);
-	joint_state.velocity.resize(4);
-	joint_state.effort.resize(4);
+	joint_state.name.resize(7);
+	joint_state.position.resize(7);
+	joint_state.velocity.resize(7);
+	joint_state.effort.resize(7);
 }
 void Output::OutputCallback(sensor_msgs::JointState output_)
 {
@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 
     ros::init(argc, argv, "function_generator");
     ros::NodeHandle n;
-    ros::Subscriber postion_sub = n.subscribe("/davinci_joystick/joint_states", 1, &Output::OutputCallback, &output);
+    ros::Subscriber postion_sub = n.subscribe("/davinci/joint_states", 1, &Output::OutputCallback, &output);
     ros::Publisher signal_pub = n.advertise<std_msgs::Float64MultiArray>("davinci_si/input",1);
     ros::Publisher setpoint_pub = n.advertise<sensor_msgs::JointState>("davinci_joystick/joint_states",1);
     ros::Publisher s_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_roll_controller/command",1);
@@ -143,7 +143,7 @@ int main(int argc, char **argv)
     printf("Amplitude: ");
     scanf("%lf",&a);
 
-    SignalGenerator input_signal("block",1,0.1);
+    SignalGenerator input_signal(str,a,f);
 
     double value =0;
     double t;
