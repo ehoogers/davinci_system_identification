@@ -1,6 +1,7 @@
 
 #include "ros/ros.h"
 #include "std_msgs/Float64MultiArray.h"
+#include "std_msgs/Float64.h"
 #include "sensor_msgs/JointState.h"
 #include "string"
 #include "math.h"
@@ -9,7 +10,7 @@
 // Namespaces
 using namespace std;
 
-#define FREQ 1000
+#define FREQ 200
 
 class StopWatch
 {
@@ -91,12 +92,12 @@ class Output
 
 public:
 	sensor_msgs::JointState joint_state;
-	void OutputCallback(sensor_msgs::JointState Output);
+	void OutputCallback(sensor_msgs::JointState output_);
 };
 
-void Output::OutputCallback(sensor_msgs::JointState Output)
+void Output::OutputCallback(sensor_msgs::JointState output_)
 {
-	joint_state = Output;
+	joint_state = output_;
 }
 
 
@@ -111,12 +112,16 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
     ros::Publisher signal_pub = n.advertise<std_msgs::Float64MultiArray>("davinci_si/input",1);
     ros::Publisher setpoint_pub = n.advertise<sensor_msgs::JointState>("davinci_joystick/joint_states",1);
-    ros::Subscriber postion_sub = n.subscribe("davinci_joystick/joint_states", 1, &Output::OutputCallback, &output);
+    ros::Publisher s_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_roll_controller/command",1);
+
+    ros::Subscriber postion_sub = n.subscribe("/davinci/joint_states", 1, &Output::OutputCallback, &output);
     ros::Rate rate(FREQ);
 
     sensor_msgs::JointState setpoint;
     std_msgs::Float64MultiArray msg;
     msg.data.resize(2);
+
+    std_msgs::Float64 Iset;
 
     StopWatch stopwatch;
 
@@ -131,7 +136,7 @@ int main(int argc, char **argv)
 
     SignalGenerator input_signal(str,a,f);
 
-    double signal;
+    double signal =0;
     double t;
 
     while (ros::ok()) // Keep spinning loop until user presses Ctrl+C
@@ -142,6 +147,9 @@ int main(int argc, char **argv)
     	msg.data[0] = t;
     	msg.data[1] = signal;
     	signal_pub.publish(msg);
+
+	Iset.data =signal;
+	s_pub.publish(Iset);
 
     	setpoint.header.stamp = ros::Time::now();
     	setpoint.name.resize(4);
@@ -161,7 +169,8 @@ int main(int argc, char **argv)
     	ros::spinOnce();
         rate.sleep(); // Sleep for the rest of the cycle, to enforce the loop rate
     }
-
+	Iset.data=0;
+	s_pub.publish(Iset);
     return 0;
 }
 
