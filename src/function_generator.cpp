@@ -91,10 +91,18 @@ class Output
 {
 
 public:
+	Output();
 	sensor_msgs::JointState joint_state;
 	void OutputCallback(sensor_msgs::JointState output_);
 };
 
+Output::Output()
+{
+	joint_state.name.resize(4);
+	joint_state.position.resize(4);
+	joint_state.velocity.resize(4);
+	joint_state.effort.resize(4);
+}
 void Output::OutputCallback(sensor_msgs::JointState output_)
 {
 	joint_state = output_;
@@ -110,11 +118,12 @@ int main(int argc, char **argv)
 
     ros::init(argc, argv, "function_generator");
     ros::NodeHandle n;
+    ros::Subscriber postion_sub = n.subscribe("/davinci_joystick/joint_states", 1, &Output::OutputCallback, &output);
     ros::Publisher signal_pub = n.advertise<std_msgs::Float64MultiArray>("davinci_si/input",1);
     ros::Publisher setpoint_pub = n.advertise<sensor_msgs::JointState>("davinci_joystick/joint_states",1);
     ros::Publisher s_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_roll_controller/command",1);
 
-    ros::Subscriber postion_sub = n.subscribe("/davinci/joint_states", 1, &Output::OutputCallback, &output);
+
     ros::Rate rate(FREQ);
 
     sensor_msgs::JointState setpoint;
@@ -134,34 +143,36 @@ int main(int argc, char **argv)
     printf("Amplitude: ");
     scanf("%lf",&a);
 
-    SignalGenerator input_signal(str,a,f);
+    SignalGenerator input_signal("block",1,0.1);
 
-    double signal =0;
+    double value =0;
     double t;
 
     while (ros::ok()) // Keep spinning loop until user presses Ctrl+C
     {
     	t = stopwatch.elapsed_time();
-    	signal = input_signal.output(t);
+    	value = input_signal.output(t);
 
     	msg.data[0] = t;
-    	msg.data[1] = signal;
+    	msg.data[1] = value;
     	signal_pub.publish(msg);
 
-	Iset.data =signal;
-	s_pub.publish(Iset);
+    	Iset.data =value;
+    	s_pub.publish(Iset);
 
     	setpoint.header.stamp = ros::Time::now();
     	setpoint.name.resize(4);
     	setpoint.position.resize(4);
+    	setpoint.effort.resize(4);
     	setpoint.name[0] ="pitch";
-    	setpoint.position[0] = signal;
+    	setpoint.position[0] = value;
     	setpoint.name[1] ="yaw";
-    	setpoint.position[1] = signal;
+    	setpoint.position[1] = value;
     	setpoint.name[2] ="roll";
-    	setpoint.position[2] = signal;
+    	setpoint.position[2] = value;
+    	setpoint.effort[2]=output.joint_state.position[2];
     	setpoint.name[3]="pinch";
-    	setpoint.position[3]=signal;
+    	setpoint.position[3]=value;
         //send the joint state
     	setpoint_pub.publish(setpoint);
 
