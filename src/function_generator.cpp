@@ -10,7 +10,7 @@
 // Namespaces
 using namespace std;
 
-#define FREQ 200
+#define FREQ 100
 
 class StopWatch
 {
@@ -42,29 +42,33 @@ void StopWatch::Reset(void)
 class SignalGenerator
 {
 public:
-	SignalGenerator(string type,double amplitude,double frequency);
+	SignalGenerator(string type, double a, double f, double off, double d);
 
 	string signal;
 	double ampl;
 	double freq;
+	double offset;
+	double delay;
 
 	double output(double t);
 
 private:
 
 };
-SignalGenerator::SignalGenerator(string type,double amplitude,double frequency)
+SignalGenerator::SignalGenerator(string type, double a, double f, double off, double d)
 {
-	ampl = amplitude;
-	freq = frequency;
 	signal = type;
+	ampl = a;
+	freq = f;
+	offset = off;
+	delay = d;
 }
 double SignalGenerator::output(double t)
 {
 	double value;
 	if(signal=="Sinus" || signal=="sinus")
 	{
-		value = ampl*cos(2*M_PI*freq*t);
+		value = offset+ampl*cos(2*M_PI*freq*t);
 	}
 	else if(signal == "Constant" || signal=="constant")
 	{
@@ -76,6 +80,18 @@ double SignalGenerator::output(double t)
 		{value = ampl;}
 		else
 		{value=-ampl;}
+		value += offset;
+	}
+	else if (signal == "step" || signal =="Step")
+	{
+		if(t>=delay)
+		{
+		value = ampl;
+		}
+		else
+		{
+			value = 0;
+		}
 	}
 	else
 	{
@@ -135,18 +151,18 @@ int main(int argc, char **argv)
     StopWatch stopwatch;
 
     char str[10];
-    double f,a;
-    printf("Enter signal: ");
+    double f,a,o,d;
+    printf("Signal :");
     scanf("%s",str);
-    printf("Frequency: ");
-    scanf("%lf",&f);
-    printf("Amplitude: ");
-    scanf("%lf",&a);
+    printf("amplitude frequency offset delay: ");
+    scanf("%lf %lf %lf %lf",&a,&f,&o,&d);
 
-    SignalGenerator input_signal(str,a,f);
+    SignalGenerator input_signal(str, a, f, o, d);
 
     double value =0;
     double t;
+
+    stopwatch.Reset();
 
     while (ros::ok()) // Keep spinning loop until user presses Ctrl+C
     {
@@ -180,8 +196,10 @@ int main(int argc, char **argv)
     	ros::spinOnce();
         rate.sleep(); // Sleep for the rest of the cycle, to enforce the loop rate
     }
+
 	Iset.data=0;
 	s_pub.publish(Iset);
+
     return 0;
 }
 
