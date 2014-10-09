@@ -162,6 +162,7 @@ int main(int argc, char **argv)
     scanf("%lf %lf %lf %lf",&a,&f,&o,&d);
 
     SignalGenerator input_signal(str, a, f, o, d);
+    
 
     double value =0;
     double t;
@@ -171,7 +172,8 @@ int main(int argc, char **argv)
     while (ros::ok()) // Keep spinning loop until user presses Ctrl+C
     {
     	t = stopwatch.elapsed_time();
-    	value = input_signal.output(t);
+    	value = input_signal.output(t) -1.1;
+
 
     	msg.data[0] = t;
     	msg.data[1] = value;
@@ -201,7 +203,7 @@ int main(int argc, char **argv)
         rate.sleep(); // Sleep for the rest of the cycle, to enforce the loop rate
     }
 
-	Iset.data=0;
+	Iset.data=-1.1;
 	s_pub.publish(Iset);
 
     return 0;
