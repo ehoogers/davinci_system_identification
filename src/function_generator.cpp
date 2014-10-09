@@ -93,6 +93,10 @@ double SignalGenerator::output(double t)
 			value = 0;
 		}
 	}
+	else if (signal == "ramp" || signal =="Ramp")
+	{
+		value = fmod(t,freq)*ampl;
+	}
 	else
 	{
 		printf("Wrong signal name!!\n");
