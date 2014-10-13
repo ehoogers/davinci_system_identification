@@ -53,7 +53,7 @@ public:
 	double output(double t);
 
 private:
-
+	bool switch_;
 };
 SignalGenerator::SignalGenerator(string type, double a, double f, double off, double d)
 {
@@ -62,6 +62,7 @@ SignalGenerator::SignalGenerator(string type, double a, double f, double off, do
 	freq = f;
 	offset = off;
 	delay = d;
+	switch_ = true;
 }
 double SignalGenerator::output(double t)
 {
@@ -81,6 +82,33 @@ double SignalGenerator::output(double t)
 		else
 		{value=-ampl;}
 		value += offset;
+	}
+	else if (signal =="switch")
+	{
+
+		if (fmod(t,10)<0.01)
+		{
+			switch_= !switch_;
+		}
+
+		if (switch_)
+		{
+			if (sin(2*M_PI*freq*t)>=0)
+			{value = ampl;}
+			else
+			{value=-ampl;}
+			value += offset;
+		}
+		else
+		{
+			if (sin(2*M_PI*2*freq*t)>=0)
+			{value = 1.1*ampl;}
+			else
+			{value= -ampl*1.1;}
+			value += offset;
+		}
+
+
 	}
 	else if (signal == "step" || signal =="Step")
 	{
@@ -180,19 +208,19 @@ int main(int argc, char **argv)
     	msg.data[1] = value;
     	signal_pub.publish(msg);
 
-	
-	if(value>=-idead && value<=idead)
-	{
-		Iset.data=0;
-	}
-	else if(value>=idead)
-	{
-		Iset.data=value-idead;
-	}
-	else
-	{
-		Iset.data=value+idead;
-	}
+
+		if(value>=-idead && value<=idead)
+		{
+			Iset.data=0;
+		}
+		else if(value>=idead)
+		{
+			Iset.data=value-idead;
+		}
+		else
+		{
+			Iset.data=value+idead;
+		}
 
     	s_pub.publish(Iset);
 
