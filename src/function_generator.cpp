@@ -141,7 +141,7 @@ int main(int argc, char **argv)
     ros::Subscriber postion_sub = n.subscribe("/davinci/joint_states", 1, &Output::OutputCallback, &output);
     ros::Publisher signal_pub = n.advertise<std_msgs::Float64MultiArray>("davinci_si/input",1);
     ros::Publisher setpoint_pub = n.advertise<sensor_msgs::JointState>("davinci_joystick/joint_states",1);
-    ros::Publisher s_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_roll_controller/command",1);
+    ros::Publisher s_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_roll_controller/command",10);
 
 
     ros::Rate rate(FREQ);
@@ -166,20 +166,34 @@ int main(int argc, char **argv)
 
     double value =0;
     double t;
-
+	
+	double idead =3.5;
     stopwatch.Reset();
 
     while (ros::ok()) // Keep spinning loop until user presses Ctrl+C
     {
     	t = stopwatch.elapsed_time();
-    	value = input_signal.output(t) -1.1;
+    	value = input_signal.output(t);
 
 
     	msg.data[0] = t;
     	msg.data[1] = value;
     	signal_pub.publish(msg);
 
-    	Iset.data =value;
+	
+	if(value>=-idead && value<=idead)
+	{
+		Iset.data=0;
+	}
+	else if(value>=idead)
+	{
+		Iset.data=value-idead;
+	}
+	else
+	{
+		Iset.data=value+idead;
+	}
+
     	s_pub.publish(Iset);
 
     	setpoint.header.stamp = ros::Time::now();
@@ -203,7 +217,7 @@ int main(int argc, char **argv)
         rate.sleep(); // Sleep for the rest of the cycle, to enforce the loop rate
     }
 
-	Iset.data=-1.1;
+	Iset.data=0;
 	s_pub.publish(Iset);
 
     return 0;
