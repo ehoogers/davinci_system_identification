@@ -83,10 +83,10 @@ double SignalGenerator::output(double t)
 		{value=-ampl;}
 		value += offset;
 	}
-	else if (signal =="switch")
+	else if (signal =="2f")
 	{
 
-		if (fmod(t,10)<0.01)
+		if (fmod(t,6)<0.01)
 		{
 			switch_= !switch_;
 		}
