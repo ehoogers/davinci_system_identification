@@ -10,7 +10,7 @@
 // Namespaces
 using namespace std;
 
-#define FREQ 100
+#define FREQ 200.0
 
 class StopWatch
 {
@@ -48,12 +48,15 @@ public:
 	double ampl;
 	double freq;
 	double offset;
-	double delay;
+	double dead;
 
 	double output(double t);
 
 private:
 	bool switch_;
+	double value_;
+	double x_;
+	int cnt;
 };
 SignalGenerator::SignalGenerator(string type, double a, double f, double off, double d)
 {
@@ -61,15 +64,18 @@ SignalGenerator::SignalGenerator(string type, double a, double f, double off, do
 	ampl = a;
 	freq = f;
 	offset = off;
-	delay = d;
+	dead = d;
 	switch_ = true;
+	value_ = 0;
+	cnt = 0;
+	x_ = 1;
 }
 double SignalGenerator::output(double t)
 {
 	double value;
 	if(signal=="Sinus" || signal=="sinus")
 	{
-		value = offset+ampl*cos(2*M_PI*freq*t);
+		value = ampl*cos(2*M_PI*freq*t);
 	}
 	else if(signal == "Constant" || signal=="constant")
 	{
@@ -77,60 +83,74 @@ double SignalGenerator::output(double t)
 	}
 	else if (signal == "Block" || signal=="block")
 	{
-		if (sin(2*M_PI*freq*t)>=0)
-		{value = ampl;}
-		else
-		{value=-ampl;}
-		value += offset;
+		if (fmod(cnt,FREQ/2/freq) <1.0)
+		{x_ = x_ * -1;}
+		
+		value = ampl*x_;
+		cnt++;
 	}
 	else if (signal =="2f")
 	{
 
-		if (fmod(t,6)<0.01)
+		if (fmod(cnt,FREQ*5/freq)<1.0)
 		{
 			switch_= !switch_;
 		}
 
 		if (switch_)
 		{
-			if (sin(2*M_PI*freq*t)>=0)
-			{value = ampl;}
-			else
-			{value=-ampl;}
-			value += offset;
+			if (fmod(cnt,FREQ/2/freq) <1.0)
+			{x_ = x_ * -1;}
+			value = ampl*x_;
 		}
 		else
 		{
-			if (sin(2*M_PI*2*freq*t)>=0)
-			{value = 1.1*ampl;}
-			else
-			{value= -ampl*1.1;}
-			value += offset;
+			if (fmod(cnt,FREQ/4/freq) <1.0)
+			{x_ = x_ * -1;}
+			value = ampl*x_;
 		}
 
+		cnt++;
+	}
 
-	}
-	else if (signal == "step" || signal =="Step")
-	{
-		if(t>=delay)
-		{
-		value = ampl;
-		}
-		else
-		{
-			value = 0;
-		}
-	}
 	else if (signal == "ramp" || signal =="Ramp")
 	{
 		value = fmod(t,freq)*ampl;
 	}
+
+	else if (signal == "stair")
+	{
+
+		if (fmod(cnt,FREQ/freq) < 1.0)
+		{		
+			value_ += ampl;
+		}
+		if (fabs(value_) > 2.0)
+		{
+			ampl = -ampl;
+			value_ += 2*ampl;
+		}
+		value = value_;
+		cnt++;
+	}
+
 	else
 	{
 		printf("Wrong signal name!!\n");
 		value=0;
 	}
 
+	value += offset;
+	if(value>=0.0)
+	{
+		value += dead;
+	}
+	else
+	{
+		value -= dead;
+	}
+
+	
 	return value;
 }
 
@@ -169,16 +189,27 @@ int main(int argc, char **argv)
     ros::Subscriber postion_sub = n.subscribe("/davinci/joint_states", 1, &Output::OutputCallback, &output);
     ros::Publisher signal_pub = n.advertise<std_msgs::Float64MultiArray>("davinci_si/input",1);
     ros::Publisher setpoint_pub = n.advertise<sensor_msgs::JointState>("davinci_joystick/joint_states",1);
-    ros::Publisher s_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_roll_controller/command",10);
+    ros::Publisher roll_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_roll_controller/command",1);
+    ros::Publisher pitch_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_pitch_controller/command",1);
+    ros::Publisher jawl_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_jaw_left_controller/command",1);
+    ros::Publisher jawr_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_jaw_right_controller/command",1);
 
 
     ros::Rate rate(FREQ);
 
     sensor_msgs::JointState setpoint;
     std_msgs::Float64MultiArray msg;
-    msg.data.resize(2);
+    msg.data.resize(4);
 
-    std_msgs::Float64 Iset;
+    std_msgs::Float64 I_roll;
+    std_msgs::Float64 I_pitch;
+    std_msgs::Float64 I_jawl;
+    std_msgs::Float64 I_jawr;
+
+    I_roll.data =0;
+    I_pitch.data =0;
+    I_jawl.data =0;
+    I_jawr.data =0;
 
     StopWatch stopwatch;
 
@@ -186,7 +217,7 @@ int main(int argc, char **argv)
     double f,a,o,d;
     printf("Signal :");
     scanf("%s",str);
-    printf("amplitude frequency offset delay: ");
+    printf("amplitude frequency offset dead_zone: ");
     scanf("%lf %lf %lf %lf",&a,&f,&o,&d);
 
     SignalGenerator input_signal(str, a, f, o, d);
@@ -195,7 +226,7 @@ int main(int argc, char **argv)
     double value =0;
     double t;
 	
-	double idead =3.5;
+	double idead =d;
     stopwatch.Reset();
 
     while (ros::ok()) // Keep spinning loop until user presses Ctrl+C
@@ -203,28 +234,23 @@ int main(int argc, char **argv)
     	t = stopwatch.elapsed_time();
     	value = input_signal.output(t);
 
+	
+	I_roll.data = value;
 
-    	msg.data[0] = t;
+    	/*msg.data[0] = t;
     	msg.data[1] = value;
-    	signal_pub.publish(msg);
+	msg.data[2] = output.joint_state.position[4];
+	msg.data[3] = output.joint_state.effort[4];
+    	signal_pub.publish(msg);*/
 
+		
 
-		if(value>=-idead && value<=idead)
-		{
-			Iset.data=0;
-		}
-		else if(value>=idead)
-		{
-			Iset.data=value-idead;
-		}
-		else
-		{
-			Iset.data=value+idead;
-		}
+    	roll_pub.publish(I_roll);
+    	//pitch_pub.publish(I_pitch);
+    	//jawl_pub.publish(I_jawl);
+    	//jawr_pub.publish(I_jawr);
 
-    	s_pub.publish(Iset);
-
-    	setpoint.header.stamp = ros::Time::now();
+    	/*setpoint.header.stamp = ros::Time::now();
     	setpoint.name.resize(4);
     	setpoint.position.resize(4);
     	setpoint.effort.resize(4);
@@ -238,15 +264,22 @@ int main(int argc, char **argv)
     	setpoint.name[3]="pinch";
     	setpoint.position[3]=value;
         //send the joint state
-    	setpoint_pub.publish(setpoint);
+    	setpoint_pub.publish(setpoint);*/
 
 
     	ros::spinOnce();
         rate.sleep(); // Sleep for the rest of the cycle, to enforce the loop rate
     }
 
-	Iset.data=0;
-	s_pub.publish(Iset);
+    I_roll.data =0;
+    I_pitch.data =0;
+    I_jawl.data =0;
+    I_jawr.data =0;
+
+    	roll_pub.publish(I_roll);
+    	pitch_pub.publish(I_pitch);
+    	jawl_pub.publish(I_jawl);
+    	jawr_pub.publish(I_jawr);
 
     return 0;
 }
