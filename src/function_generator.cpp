@@ -87,6 +87,11 @@ double SignalGenerator::output(double t)
 		{x_ = x_ * -1;}
 		
 		value = ampl*x_;
+
+		if (cnt == 60*FREQ)
+		{
+			cnt = 0;
+		}
 		cnt++;
 	}
 	else if (signal =="2f")
@@ -109,6 +114,11 @@ double SignalGenerator::output(double t)
 			{x_ = x_ * -1;}
 			value = ampl*x_;
 		}
+		
+		if (cnt == 60*FREQ)
+		{
+			cnt = 0;
+		}
 
 		cnt++;
 	}
@@ -125,7 +135,7 @@ double SignalGenerator::output(double t)
 		{		
 			value_ += ampl;
 		}
-		if (fabs(value_) > 2.0)
+		if (fabs(value_) > 10.0)
 		{
 			ampl = -ampl;
 			value_ += 2*ampl;
@@ -237,11 +247,11 @@ int main(int argc, char **argv)
 	
 	I_roll.data = value;
 
-    	/*msg.data[0] = t;
+    	msg.data[0] = t;
     	msg.data[1] = value;
 	msg.data[2] = output.joint_state.position[4];
 	msg.data[3] = output.joint_state.effort[4];
-    	signal_pub.publish(msg);*/
+    	signal_pub.publish(msg);
 
 		
 
