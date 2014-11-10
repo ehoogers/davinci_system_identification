@@ -135,7 +135,7 @@ double SignalGenerator::output(double t)
 		{		
 			value_ += ampl;
 		}
-		if (fabs(value_) > 10.0)
+		if (fabs(value_) > 1.3)
 		{
 			ampl = -ampl;
 			value_ += 2*ampl;
@@ -245,7 +245,10 @@ int main(int argc, char **argv)
     	value = input_signal.output(t);
 
 	
+	I_jawl.data = value;
+	I_jawr.data = -value;
 	I_roll.data = value;
+	I_pitch.data = value;
 
     	msg.data[0] = t;
     	msg.data[1] = value;
@@ -256,9 +259,9 @@ int main(int argc, char **argv)
 		
 
     	roll_pub.publish(I_roll);
-    	//pitch_pub.publish(I_pitch);
-    	//jawl_pub.publish(I_jawl);
-    	//jawr_pub.publish(I_jawr);
+    	pitch_pub.publish(I_pitch);
+    	jawl_pub.publish(I_jawl);
+    	jawr_pub.publish(I_jawr);
 
     	/*setpoint.header.stamp = ros::Time::now();
     	setpoint.name.resize(4);
@@ -282,9 +285,9 @@ int main(int argc, char **argv)
     }
 
     I_roll.data =0;
-    I_pitch.data =0;
-    I_jawl.data =0;
-    I_jawr.data =0;
+    //I_pitch.data =0;
+    //I_jawl.data =0;
+    //I_jawr.data =0;
 
     	roll_pub.publish(I_roll);
     	pitch_pub.publish(I_pitch);
