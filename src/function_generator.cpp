@@ -10,7 +10,7 @@
 // Namespaces
 using namespace std;
 
-#define FREQ 200.0
+#define FREQ 100.0
 
 class StopWatch
 {
@@ -42,13 +42,12 @@ void StopWatch::Reset(void)
 class SignalGenerator
 {
 public:
-	SignalGenerator(string type, double a, double f, double off, double d);
+	SignalGenerator(string type, double a, double f, double off);
 
 	string signal;
 	double ampl;
 	double freq;
 	double offset;
-	double dead;
 
 	double output(double t);
 
@@ -58,13 +57,12 @@ private:
 	double x_;
 	int cnt;
 };
-SignalGenerator::SignalGenerator(string type, double a, double f, double off, double d)
+SignalGenerator::SignalGenerator(string type, double a, double f, double off)
 {
 	signal = type;
 	ampl = a;
 	freq = f;
 	offset = off;
-	dead = d;
 	switch_ = true;
 	value_ = 0;
 	cnt = 0;
@@ -75,8 +73,19 @@ double SignalGenerator::output(double t)
 	double value;
 	if(signal=="Sinus" || signal=="sinus")
 	{
-		value = ampl*cos(2*M_PI*freq*t);
+		value = ampl*sin(2*M_PI*freq*t);
 	}
+
+	else if(signal=="Multisine" || signal=="ms")
+	{
+		double y1 = ampl*sin(2*M_PI*freq*t);
+		double y2 = ampl*sin(2*M_PI*freq*t*2)/2;
+		double y3 = ampl*sin(2*M_PI*freq*t*5)/5;
+		double y4 = ampl*sin(2*M_PI*freq*t*8)/8;
+		double y5 = ampl*sin(2*M_PI*freq*t*10)/10;
+		value = y1 + y2 + y3 + y4 + y5;
+	}
+
 	else if(signal == "Constant" || signal=="constant")
 	{
 		value = ampl;
@@ -151,16 +160,6 @@ double SignalGenerator::output(double t)
 	}
 
 	value += offset;
-	if(value>=0.0)
-	{
-		value += dead;
-	}
-	else
-	{
-		value -= dead;
-	}
-
-	
 	return value;
 }
 
@@ -197,46 +196,63 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "function_generator");
     ros::NodeHandle n;
     ros::Subscriber postion_sub = n.subscribe("/davinci/joint_states", 1, &Output::OutputCallback, &output);
+
     ros::Publisher signal_pub = n.advertise<std_msgs::Float64MultiArray>("davinci_si/input",1);
     ros::Publisher setpoint_pub = n.advertise<sensor_msgs::JointState>("davinci_joystick/joint_states",1);
     ros::Publisher roll_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_roll_controller/command",1);
     ros::Publisher pitch_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_pitch_controller/command",1);
     ros::Publisher jawl_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_jaw_left_controller/command",1);
     ros::Publisher jawr_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_jaw_right_controller/command",1);
-
+    ros::Publisher slide_pub = n.advertise<std_msgs::Float64>("/davinci/p4_instrument_slide_controller/command",1);
+    ros::Publisher hand_roll_pub = n.advertise<std_msgs::Float64>("/davinci/p4_hand_roll_controller/command",1);
+    ros::Publisher hand_pitch_pub = n.advertise<std_msgs::Float64>("/davinci/p4_hand_pitch_controller/command",1);
+    ros::Publisher joystick_sp_pub = n.advertise<std_msgs::Float64MultiArray>("davinci_joystick/I_sp",1);
 
     ros::Rate rate(FREQ);
 
     sensor_msgs::JointState setpoint;
     std_msgs::Float64MultiArray msg;
-    msg.data.resize(4);
+    msg.data.resize(5);
 
     std_msgs::Float64 I_roll;
     std_msgs::Float64 I_pitch;
     std_msgs::Float64 I_jawl;
     std_msgs::Float64 I_jawr;
+    std_msgs::Float64 I_slide;
+    std_msgs::Float64 I_hand_roll;
+    std_msgs::Float64 I_hand_pitch;
+
+
+    std_msgs::Float64MultiArray joystick_sp;
+    joystick_sp.data.resize(4);
+
+joystick_sp.data[0] = 0;
+joystick_sp.data[1] = 0;
+joystick_sp.data[2] = 0;
+joystick_sp.data[3] = 0;
 
     I_roll.data =0;
     I_pitch.data =0;
     I_jawl.data =0;
     I_jawr.data =0;
+    I_slide.data =0;
+    I_hand_roll.data =0;
+    I_hand_pitch.data =0;
 
     StopWatch stopwatch;
 
     char str[10];
-    double f,a,o,d;
+    double f,a,o;
     printf("Signal :");
     scanf("%s",str);
-    printf("amplitude frequency offset dead_zone: ");
-    scanf("%lf %lf %lf %lf",&a,&f,&o,&d);
+    printf("amplitude frequency offset: ");
+    scanf("%lf %lf %lf",&a,&f,&o);
 
-    SignalGenerator input_signal(str, a, f, o, d);
+    SignalGenerator input_signal(str, a, f, o);
     
 
     double value =0;
     double t;
-	
-	double idead =d;
     stopwatch.Reset();
 
     while (ros::ok()) // Keep spinning loop until user presses Ctrl+C
@@ -244,40 +260,36 @@ int main(int argc, char **argv)
     	t = stopwatch.elapsed_time();
     	value = input_signal.output(t);
 
+	joystick_sp.data[0] = 0; // value;
+	joystick_sp.data[1] = 0; // value;
+	joystick_sp.data[2] = 0; // value;
+	joystick_sp.data[3] = 0; //value;
+
 	
-	I_jawl.data = value;
-	I_jawr.data = -value;
+	I_jawl.data =0; // value;
+	I_jawr.data = 0; //value;
 	I_roll.data = value;
-	I_pitch.data = value;
+	I_pitch.data = 0; //value;
+	I_slide.data = 0; //value;
+	I_hand_roll.data = 0; //value;
+	I_hand_pitch.data = 0; //value;
 
     	msg.data[0] = t;
     	msg.data[1] = value;
-	msg.data[2] = output.joint_state.position[4];
-	msg.data[3] = output.joint_state.effort[4];
+	msg.data[2] = output.joint_state.position[5];
+	msg.data[3] = output.joint_state.velocity[5];
+	msg.data[4] = output.joint_state.effort[5];
     	signal_pub.publish(msg);
-
 		
 
     	roll_pub.publish(I_roll);
-    	pitch_pub.publish(I_pitch);
-    	jawl_pub.publish(I_jawl);
-    	jawr_pub.publish(I_jawr);
-
-    	/*setpoint.header.stamp = ros::Time::now();
-    	setpoint.name.resize(4);
-    	setpoint.position.resize(4);
-    	setpoint.effort.resize(4);
-    	setpoint.name[0] ="pitch";
-    	setpoint.position[0] = value;
-    	setpoint.name[1] ="yaw";
-    	setpoint.position[1] = value;
-    	setpoint.name[2] ="roll";
-    	setpoint.position[2] = value;
-    	setpoint.effort[2]=output.joint_state.position[2];
-    	setpoint.name[3]="pinch";
-    	setpoint.position[3]=value;
-        //send the joint state
-    	setpoint_pub.publish(setpoint);*/
+    	//pitch_pub.publish(I_pitch);
+    	//jawl_pub.publish(I_jawl);
+    	//jawr_pub.publish(I_jawr);
+	//slide_pub.publish(I_slide);
+	//hand_roll_pub.publish(I_hand_roll);
+	//hand_pitch_pub.publish(I_hand_pitch);
+	//joystick_sp_pub.publish(joystick_sp);
 
 
     	ros::spinOnce();
@@ -285,15 +297,19 @@ int main(int argc, char **argv)
     }
 
     I_roll.data =0;
-    //I_pitch.data =0;
-    //I_jawl.data =0;
-    //I_jawr.data =0;
+    I_pitch.data =0;
+    I_jawl.data =0;
+    I_jawr.data =0;
+    I_hand_roll.data =0;
+    I_hand_pitch.data =0;
 
     	roll_pub.publish(I_roll);
     	pitch_pub.publish(I_pitch);
     	jawl_pub.publish(I_jawl);
     	jawr_pub.publish(I_jawr);
-
+	slide_pub.publish(I_slide);
+	hand_roll_pub.publish(I_slide);
+	hand_pitch_pub.publish(I_slide);
     return 0;
 }
 
